@@ -10,20 +10,23 @@
 
 ---
 
-**Open Codex** is a fully open-source command-line AI assistant inspired by OpenAI Codex, supporting local language models like `phi-4-mini`.
+**Open Codex** is a fully open-source command-line AI assistant inspired by OpenAI Codex, supporting optimized local language models.
 
-No API key is required. Everything runs locally.
+No API key is required for the default model. Everything runs locally.
 
 Supports:
 - **One-shot mode**: `open-codex "list all folders"` -> returns shell command
-- 🧠 Local-only execution using supported OS models (currently `phi-4-mini`)
+- 🧠 Local-only execution using optimized models:
+  - phi-4-mini (default, no auth required)
+  - qwen1.5-7b-chat (auth required, enhanced for coding tasks)
 
 ---
 ## ✨ Features
 
 - Natural Language to Shell Command (via local models)
 - Works on macOS, Linux, and Windows (Python-based)
-- Confirmation before execution
+- Smart command validation and error handling
+- Real-time command output streaming
 - Add to clipboard / abort / execute prompt
 - One-shot interaction mode (interactive and function-calling coming soon)
 - Colored terminal output for better readability
@@ -78,13 +81,42 @@ Once installed, you can use the `open-codex` CLI globally.
 
 ### One-shot mode
 
+Basic usage with default model (phi-4-mini):
 ```bash
-open-codex "untar file abc.tar"
+open-codex "list all python files"
 ```
 
-✅ Codex suggests a shell command  
+Using Qwen model for enhanced coding tasks:
+```bash
+# First, set your Hugging Face token
+export HUGGINGFACE_TOKEN=your_token_here
+
+# Then use the Qwen model
+open-codex --model qwen-2.5-coder "find python files modified today"
+
+# Or provide token directly
+open-codex --model qwen-2.5-coder --hf-token your_token_here "your command"
+```
+
+✅ Codex suggests a validated shell command  
+✅ Shows real-time command output  
+✅ Provides clear error messages  
 ✅ Asks for confirmation / add to clipboard / abort  
-✅ Executes if approved
+✅ Executes if approved  
+
+### Model Overview
+
+#### phi-4-mini (Default)
+- Fast and lightweight
+- No authentication required
+- Optimized for quick shell commands
+- Best for basic file operations and system tasks
+
+#### qwen1.5-7b-chat
+- Enhanced for coding tasks
+- Requires Hugging Face authentication
+- Improved command validation
+- Better for complex development tasks
 
 ---
 

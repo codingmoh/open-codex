@@ -10,7 +10,8 @@ from huggingface_hub import hf_hub_download, login
 class AgentQwen25Coder(LLMAgent):
     def download_model(self, model_filename: str,
                         repo_id: str, 
-                        local_dir: str) -> str:
+                        local_dir: str,
+                        token: Optional[str] = None) -> str:
         print(
             "\n🤖 Welcome to Open Codex!\n"
             "📦 First run requires downloading the model.\n"
@@ -22,6 +23,8 @@ class AgentQwen25Coder(LLMAgent):
             repo_id=repo_id,
             filename=model_filename,
             local_dir=local_dir,
+            token=token,
+            force_download=True,  # Force download to ensure the latest version
         )
         duration = time.time() - start
         print(f"✅ Model downloaded ({duration:.1f}s)")

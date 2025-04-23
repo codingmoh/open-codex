@@ -1,4 +1,5 @@
 import time
+import multiprocessing
 from typing import List, cast
 from llama_cpp import CreateCompletionResponse, Llama
 from open_codex.interfaces.llm_agent import LLMAgent
@@ -11,12 +12,10 @@ class AgentPhi4Mini(LLMAgent):
                         repo_id: str, 
                         local_dir: str) -> str:
         print(
-            "\n🤖 Thank you for using Open Codex!\n"
-            "📦 For the first run, we need to download the model from Hugging Face.\n"
-            "⏬ This only happens once – it’ll be cached locally for future use.\n"
-            "🔄 Sit tight, the download will begin now...\n"
+            "\n🤖 Welcome to Open Codex!\n"
+            "📦 First run requires downloading the model.\n"
+            "⚡️ This model is optimized for quick responses.\n"
         )
-        print("\n⏬ Downloading model phi4-mini ...")
         
         start = time.time()
         model_path:str = hf_hub_download(
@@ -24,8 +23,8 @@ class AgentPhi4Mini(LLMAgent):
             filename=model_filename,
             local_dir=local_dir,
         )
-        end = time.time()
-        print(f"✅ Model downloaded in {end - start:.2f}s\n")
+        duration = time.time() - start
+        print(f"✅ Model downloaded ({duration:.1f}s)")
         return model_path
 
     def __init__(self, system_prompt: str):
@@ -34,38 +33,46 @@ class AgentPhi4Mini(LLMAgent):
         local_dir = os.path.expanduser("~/.cache/open-codex")
         model_path = os.path.join(local_dir, model_filename)
 
-        # check if the model is already downloaded
         if not os.path.exists(model_path):
-            # download the model
             model_path = self.download_model(model_filename, repo_id, local_dir)
         else:
-            print(f"We are locking and loading the model for you...\n")
+            print("🚀 Loading Phi-4-mini model...")
 
-        # suppress the stderr output from llama_cpp
-        # this is a workaround for the llama_cpp library
-        # which prints a lot of warnings and errors to stderr
-        # when loading the model
-        # this is a temporary solution until the library is fixed
+        # Get optimal thread count for the system
+        n_threads = min(4, multiprocessing.cpu_count())
+
         with AgentPhi4Mini.suppress_native_stderr():
-            self.llm: Llama = Llama(model_path=model_path)  # type: ignore
+            self.llm: Llama = Llama(
+                model_path=model_path,
+                n_ctx=2048,     # Smaller context for faster responses
+                n_threads=n_threads,  # Use optimal thread count
+                n_batch=256,    # Balanced batch size
+                use_mlock=True, # Lock memory to prevent swapping
+                use_mmap=True,  # Use memory mapping for faster loading
+            )
+            print("✨ Model ready!")
 
         self.system_prompt = system_prompt
-
 
     def one_shot_mode(self, user_input: str) -> str:
         chat_history = [{"role": "system", "content": self.system_prompt}]
         chat_history.append({"role": "user", "content": user_input})
         full_prompt = self.format_chat(chat_history)
+        
         with AgentPhi4Mini.suppress_native_stderr():
-            output_raw = self.llm(prompt=full_prompt, max_tokens=100, temperature=0.2, stream=False)
+            output_raw = self.llm(
+                prompt=full_prompt,
+                max_tokens=100,
+                temperature=0.2,
+                stream=False,
+                top_p=0.1,      # More focused responses
+                repeat_penalty=1.1  # Reduce repetition
+            )
         
-        # unfortuntely llama_cpp has a union type for the output
         output = cast(CreateCompletionResponse, output_raw)
-        
-        assistant_reply : str = output["choices"][0]["text"].strip() 
-        return assistant_reply 
-        
-    
+        assistant_reply: str = output["choices"][0]["text"].strip()
+        return assistant_reply
+
     def format_chat(self, messages: List[dict[str, str]]) -> str:
         chat_prompt = ""
         for msg in messages:

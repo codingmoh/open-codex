@@ -21,29 +21,20 @@ RESET = "\033[0m"
 TERM_WIDTH = shutil.get_terminal_size().columns
 
 def print_banner(text: str, color: str = BLUE, char: str = "=") -> None:
-    """Print a centered banner with the given text"""
     padding = char * ((TERM_WIDTH - len(text) - 2) // 2)
     print(f"{color}{padding} {text} {padding}{RESET}")
 
 def print_timestamp(prefix: str = "") -> None:
-    """Print current timestamp in a consistent format"""
     timestamp = datetime.now().strftime("%H:%M:%S")
     print(f"{YELLOW}{prefix}[{timestamp}]{RESET}")
 
-# Capture single keypress (terminal) from the user
-# and returns it as a string. It works on both Windows and Unix systems.
-# Windows
+# Capture single keypress
 if sys.platform == "win32":
     import msvcrt
-
     def get_keypress():
         return msvcrt.getch().decode("utf-8")
-
-# Unix (Linux/macOS)
 else:
-    import termios
-    import tty
-
+    import termios, tty
     def get_keypress():
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
@@ -64,7 +55,7 @@ def print_response(command: str):
     print(f"{BOLD}[c]{RESET} Copy to clipboard")
     print(f"{BOLD}[a]{RESET} Abort")
     print(f"\n{BLUE}Press key: ", end="", flush=True)
-    
+
     choice = get_keypress().lower()
     print(f"{RESET}")
 
@@ -74,7 +65,6 @@ def print_response(command: str):
         print(f"{BLUE}Running: {command}{RESET}\n")
         
         try:
-            # Use Popen for real-time output with better error handling
             process = subprocess.Popen(
                 command,
                 shell=True,
@@ -83,31 +73,25 @@ def print_response(command: str):
                 text=True,
                 bufsize=1,
                 universal_newlines=True,
-                cwd=os.getcwd(),  # Ensure we're in the correct directory
-                env=os.environ.copy()  # Pass through environment variables
+                cwd=os.getcwd(),
+                env=os.environ.copy()
             )
             
             permission_error = False
-            # Stream output in real-time
             while True:
-                # Read stdout
                 stdout_line = process.stdout.readline() if process.stdout else ""
                 if stdout_line:
                     print(f"{GREEN}{stdout_line.rstrip()}{RESET}")
                 
-                # Read stderr
                 stderr_line = process.stderr.readline() if process.stderr else ""
                 if stderr_line:
-                    # Check for permission errors
                     if "Permission denied" in stderr_line:
                         permission_error = True
                     print(f"{RED}{stderr_line.rstrip()}{RESET}")
                 
-                # Check if process has finished
                 if process.poll() is not None and not stdout_line and not stderr_line:
                     break
             
-            # Print final status
             if process.returncode == 0:
                 print(f"\n{GREEN}✓ Command completed successfully{RESET}")
             else:
@@ -136,6 +120,7 @@ def print_response(command: str):
         print(f"{RED}Unknown choice. Nothing happened.{RESET}")
 
 def one_shot_mode(agent: LLMAgent, prompt: str):
+    print(f"{BLUE}Using model: {agent.model_name}{RESET}")
     try:
         response = agent.one_shot_mode(prompt)
         print_response(response)
@@ -143,7 +128,6 @@ def one_shot_mode(agent: LLMAgent, prompt: str):
         print(f"{RED}Error: {e}{RESET}")
 
 def print_help_message():
-    """Print help message with usage examples."""
     print_banner("Open Codex - Natural Language to CLI commands")
     print(f"{BLUE}Usage examples:{RESET}")
     print(f"{GREEN}open-codex \"list all files in current directory\"")
@@ -164,17 +148,17 @@ def main():
     parser = argparse.ArgumentParser(description="Open Codex - Natural Language to CLI commands")
     parser.add_argument("prompt", nargs="*", help="Optional prompt for one-shot mode")
     parser.add_argument("--model", type=str, choices=["phi-4-mini", "qwen-2.5-coder"],
-                      default="phi-4-mini", help="Choose the model to use")
+                        default="phi-4-mini", help="Choose the model to use")
     parser.add_argument("--hf-token", type=str, help="Hugging Face API token for authenticated models")
     args = parser.parse_args()
     prompt = " ".join(args.prompt).strip()
+
     if not prompt or prompt == "--help":
         print_help_message()
         sys.exit(1)
     
     try:
         agent = AgentBuilder.get_agent(model=args.model, hf_token=args.hf_token)
-        print(f"{BLUE}Using model: {args.model}{RESET}")
         one_shot_mode(agent, prompt)
     except ValueError as e:
         print(f"{RED}Error: {str(e)}{RESET}")

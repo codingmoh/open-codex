@@ -1,13 +1,15 @@
+import contextlib
+import os
 import time
 import multiprocessing
 from typing import List, cast
+
+from huggingface_hub import hf_hub_download  # type: ignore
 from llama_cpp import CreateCompletionResponse, Llama
 from open_codex.interfaces.llm_agent import LLMAgent
-import contextlib
-import os
-from huggingface_hub import hf_hub_download # type: ignore
 
 class AgentPhi4Mini(LLMAgent):
+    
     def download_model(self, model_filename: str,
                         repo_id: str, 
                         local_dir: str) -> str:
@@ -42,15 +44,22 @@ class AgentPhi4Mini(LLMAgent):
         n_threads = min(4, multiprocessing.cpu_count())
 
         with AgentPhi4Mini.suppress_native_stderr():
-            self.llm: Llama = Llama(
-                model_path=model_path,
-                n_ctx=2048,     # Smaller context for faster responses
-                n_threads=n_threads,  # Use optimal thread count
-                n_batch=256,    # Balanced batch size
-                use_mlock=True, # Lock memory to prevent swapping
-                use_mmap=True,  # Use memory mapping for faster loading
-            )
-            print("✨ Model ready!")
+          lib_path = os.path.join(os.path.dirname(__file__), "llama_cpp", "lib", "libllama.dylib")
+          llama_kwargs = {
+              "model_path": model_path,
+              "n_ctx": 2048,
+              "n_threads": n_threads,
+              "n_batch": 256,
+              "use_mlock": True,
+              "use_mmap": True,
+          }
+
+          if os.path.exists(lib_path):
+              llama_kwargs["lib_path"] = lib_path
+
+          self.llm: Llama = Llama(**llama_kwargs)
+          print("✨ Model ready!")
+
 
         self.system_prompt = system_prompt
 

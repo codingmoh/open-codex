@@ -2,9 +2,7 @@
 
 <h1 align="center">Open Codex CLI</h1>
 <p align="center">Lightweight coding agent that runs in your terminal</p>
-<p align="center"><code>brew tap codingmoh/open-codex
-</code></p>
-<p align="center"><code>brew install open-codex</code></p>
+<p align="center"><code>brew tap codingmoh/open-codex && brew install open-codex</code></p>
 
 ![Codex demo GIF using: codex "explain this codebase to me"](./.github/demo.gif)
 

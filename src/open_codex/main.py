@@ -165,4 +165,14 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
+    # We call multiprocessing.freeze_support() because we are using PyInstaller to build a frozen binary.
+    # When Python spawns helper processes (e.g., for Hugging Face downloads or resource tracking),
+    # it uses sys.executable to start the current executable with special multiprocessing arguments.
+    # Without freeze_support(), the frozen app would accidentally rerun the main CLI logic 
+    # and crash (e.g., with argparse errors).
+    # freeze_support() ensures the subprocess is handled correctly without restarting the full app.
+    # This is required on macOS and Windows, where "spawn" is the default multiprocessing method.
+    # See: https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html#when-to-call-multiprocessing-freeze-support
+    from multiprocessing import freeze_support
+    freeze_support()
     main()

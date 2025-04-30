@@ -10,6 +10,10 @@ from open_codex.agent_builder import AgentBuilder, ModelType
 from open_codex.interfaces.llm_agent import LLMAgent
 
 # ANSI color codes
+
+from open_codex.agent_builder import AgentBuilder
+from open_codex.interfaces.llm_agent import LLMAgent
+
 GREEN = "\033[92m"
 RED = "\033[91m"
 BLUE = "\033[94m"
@@ -45,124 +49,87 @@ else:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return key
 
-def print_response(command: str):
-    print_banner("Command Found")
-    print(f"{GREEN}{BOLD}{command}{RESET}")
-    print_banner("Options")
-    
-    print(f"{BLUE}What would you like to do?{RESET}")
-    print(f"{BOLD}[e]{RESET} Execute command")
-    print(f"{BOLD}[c]{RESET} Copy to clipboard")
-    print(f"{BOLD}[a]{RESET} Abort")
-    print(f"\n{BLUE}Press key: ", end="", flush=True)
-
+def get_user_action():
+    print(f"{BLUE}What do you want to do with this command?{RESET}")
+    print(f"{BLUE}[c] Copy  [e] Execute  [a] Abort{RESET}")
+    print(f"{BLUE}Press key: ", end="", flush=True)
     choice = get_keypress().lower()
+    return choice
+
+def run_user_action(choice: str, command: str):
+    if choice == "c":
+        print(f"{GREEN}Copying command to clipboard...{RESET}")
+        subprocess.run("pbcopy", universal_newlines=True, input=command)
+        print(f"{GREEN}Command copied to clipboard!{RESET}")
+    elif choice == "e":
+        print(f"{GREEN}Executing command...{RESET}")
+        subprocess.run(command, shell=True)
+    else: 
+        print(f"{RED}Aborting...{RESET}")
+        sys.exit(1)  
+
+def print_response(command: str):
+    print(f"{BLUE}Command found:\n=====================")
+    print(f"{GREEN}{command}{RESET}")
+    print(f"{BLUE}====================={RESET}")
     print(f"{RESET}")
 
-    if choice == "e":
-        print_banner("Executing Command")
-        print_timestamp()
-        print(f"{BLUE}Running: {command}{RESET}\n")
-        
-        try:
-            process = subprocess.Popen(
-                command,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,
-                universal_newlines=True,
-                cwd=os.getcwd(),
-                env=os.environ.copy()
-            )
-            
-            permission_error = False
-            while True:
-                stdout_line = process.stdout.readline() if process.stdout else ""
-                if stdout_line:
-                    print(f"{GREEN}{stdout_line.rstrip()}{RESET}")
-                
-                stderr_line = process.stderr.readline() if process.stderr else ""
-                if stderr_line:
-                    if "Permission denied" in stderr_line:
-                        permission_error = True
-                    print(f"{RED}{stderr_line.rstrip()}{RESET}")
-                
-                if process.poll() is not None and not stdout_line and not stderr_line:
-                    break
-            
-            if process.returncode == 0:
-                print(f"\n{GREEN}✓ Command completed successfully{RESET}")
-            else:
-                error_msg = "✗ Command failed"
-                if permission_error:
-                    error_msg += " due to permission issues. Try:\n"
-                    error_msg += f"  1. Using sudo (if appropriate)\n"
-                    error_msg += f"  2. Checking file/directory permissions\n"
-                    error_msg += f"  3. Running from a directory you have access to"
-                else:
-                    error_msg += f" with exit code {process.returncode}"
-                print(f"\n{RED}{error_msg}{RESET}")
-
-        except Exception as e:
-            print(f"\n{RED}✗ Error executing command: {str(e)}{RESET}")
-        
-        print_timestamp("Finished at ")
-
-    elif choice == "c":
-        pyperclip.copy(command)
-        print(f"{GREEN}✓ Command copied to clipboard!{RESET}")
-
-    elif choice == "a":
-        print(f"{BLUE}Operation aborted.{RESET}")
+def get_agent(args: argparse.Namespace) -> LLMAgent:
+    model: str = args.model
+    if args.ollama:
+        print(f"{BLUE}Using Ollama with model: {model}{RESET}")
+        return AgentBuilder.get_ollama_agent(model=model, host=args.ollama_host)        
     else:
-        print(f"{RED}Unknown choice. Nothing happened.{RESET}")
+        print(f"{BLUE}Using model: phi-4-mini-instruct{RESET}")
+        return AgentBuilder.get_phi_agent()
 
-def one_shot_mode(agent: LLMAgent, prompt: str):
-    print(f"{BLUE}Using model: {agent.model_name}{RESET}")
+def run_one_shot(agent: LLMAgent, user_prompt: str) -> str:   
     try:
-        response = agent.one_shot_mode(prompt)
-        print_response(response)
+        return agent.one_shot_mode(user_prompt)
+    except ConnectionError:
+        print(f"{RED}Could not connect to Model.{RESET}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"{RED}Error: {e}{RESET}")
+        print(f"{RED}Unexpected error: {e}{RESET}", file=sys.stderr)
+        print(f"{RED}Exiting...{RESET}", file=sys.stderr)
+        sys.exit(1)
 
-def print_help_message():
-    print_banner("Open Codex - Natural Language to CLI commands")
-    print(f"{BLUE}Usage examples:{RESET}")
-    print(f"{GREEN}open-codex \"list all files in current directory\"")
-    print(f"{GREEN}open-codex --model qwen-2.5-coder --hf-token YOUR_TOKEN \"find python files\"")
-    print(f"{GREEN}open-codex \"create a tarball of the src directory\"")
-    print()
-    print(f"{BLUE}Available models:{RESET}")
-    print(f"{GREEN}  - phi-4-mini (default)")
-    print(f"{GREEN}  - qwen-2.5-coder (requires Hugging Face authentication)")
-    print()
-    print(f"{BLUE}Authentication:{RESET}")
-    print(f"{GREEN}For Qwen 2.5 Coder, you can provide your Hugging Face token:")
-    print(f"{GREEN}1. Via environment variable: export HUGGINGFACE_TOKEN=your_token")
-    print(f"{GREEN}2. Via command line: --hf-token your_token")
-    print()
+def get_help_message():
+    return f"""
+    {BLUE}Usage examples:{RESET}
+    {GREEN}open-codex list all files in current directory
+    {GREEN}open-codex --ollama find all python files modified in the last week
+    {GREEN}open-codex --ollama --model llama3 "create a tarball of the src directory
+    """
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Open Codex is a command line interface for LLMs."
+                                     "It can be used to generate shell commands from natural language prompts.",
+                                     formatter_class=argparse.RawTextHelpFormatter,
+                                     epilog=get_help_message())
+
+    parser.add_argument("prompt", nargs="+", 
+                        help="Natural language prompt")
+    parser.add_argument("--model", type=str, 
+                        help="Model name to use (default: phi4-mini)", default="phi4-mini:latest")
+    parser.add_argument("--ollama", action="store_true", 
+                        help="Use Ollama for LLM inference, use --model to specify the model")
+    parser.add_argument("--ollama-host", type=str, default="http://localhost:11434", 
+                        help="Configure the host for the Ollama API. " \
+                        "If left empty, the default http://localhost:11434 is used.")
+
+    return parser.parse_args()
 
 def main():
-    parser = argparse.ArgumentParser(description="Open Codex - Natural Language to CLI commands")
-    parser.add_argument("prompt", nargs="*", help="Optional prompt for one-shot mode")
-    parser.add_argument("--model", type=str, choices=["phi-4-mini", "qwen-2.5-coder"],
-                        default="phi-4-mini", help="Choose the model to use")
-    parser.add_argument("--hf-token", type=str, help="Hugging Face API token for authenticated models")
-    args = parser.parse_args()
-    prompt = " ".join(args.prompt).strip()
+    args = parse_args()
+    agent = get_agent(args)
 
-    if not prompt or prompt == "--help":
-        print_help_message()
-        sys.exit(1)
-    
-    try:
-        agent = AgentBuilder.get_agent(model=args.model, hf_token=args.hf_token)
-        one_shot_mode(agent, prompt)
-    except ValueError as e:
-        print(f"{RED}Error: {str(e)}{RESET}")
-        sys.exit(1)
+    # join the prompt arguments into a single string
+    prompt = " ".join(args.prompt).strip() 
+    response = run_one_shot(agent, prompt)
+    print_response(response)
+    action = get_user_action()
+    run_user_action(action, response)
 
 if __name__ == "__main__":
     # We call multiprocessing.freeze_support() because we are using PyInstaller to build a frozen binary.

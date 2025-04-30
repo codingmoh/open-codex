@@ -2,6 +2,9 @@ import sys
 import argparse
 import subprocess
 
+from open_codex.agent_builder import AgentBuilder
+from open_codex.interfaces.llm_agent import LLMAgent
+
 GREEN = "\033[92m"
 RED = "\033[91m"
 BLUE = "\033[94m"
@@ -28,61 +31,87 @@ else:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return key
 
+def get_user_action():
+    print(f"{BLUE}What do you want to do with this command?{RESET}")
+    print(f"{BLUE}[c] Copy  [e] Execute  [a] Abort{RESET}")
+    print(f"{BLUE}Press key: ", end="", flush=True)
+    choice = get_keypress().lower()
+    return choice
+
+def run_user_action(choice: str, command: str):
+    if choice == "c":
+        print(f"{GREEN}Copying command to clipboard...{RESET}")
+        subprocess.run("pbcopy", universal_newlines=True, input=command)
+        print(f"{GREEN}Command copied to clipboard!{RESET}")
+    elif choice == "e":
+        print(f"{GREEN}Executing command...{RESET}")
+        subprocess.run(command, shell=True)
+    else: 
+        print(f"{RED}Aborting...{RESET}")
+        sys.exit(1)  
+
 def print_response(command: str):
     print(f"{BLUE}Command found:\n=====================")
     print(f"{GREEN}{command}{RESET}")
     print(f"{BLUE}====================={RESET}")
-    print(f"{BLUE}What do you want to do with this command?{RESET}")
-    print(f"{BLUE}[c] Copy  [e] Execute  [a] Abort{RESET}")
-    print(f"{BLUE}Press key: ", end="", flush=True)
-
-    choice = get_keypress().lower()
     print(f"{RESET}")
 
-    if choice == "e":
-        print(f"{BLUE}Executing command: {command}{RESET}")
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        print(f"{GREEN}Command output: {result.stdout}{RESET}")
-        if result.stderr:
-            print(f"{RED}Error: {result.stderr}{RESET}")
-    elif choice == "c":
-        import pyperclip  # ⏱ lazy import
-        pyperclip.copy(command)
-        print(f"{GREEN}Command copied to clipboard!{RESET}")
-    elif choice == "a":
-        print(f"{BLUE}Aborted.{RESET}")
+def get_agent(args: argparse.Namespace) -> LLMAgent:
+    model: str = args.model
+    if args.ollama:
+        print(f"{BLUE}Using Ollama with model: {model}{RESET}")
+        return AgentBuilder.get_ollama_agent(model=model, host=args.ollama_host)        
     else:
-        print(f"{RED}Unknown choice. Nothing happened.{RESET}")
+        print(f"{BLUE}Using model: phi-4-mini-instruct{RESET}")
+        return AgentBuilder.get_phi_agent()
 
-def one_shot_mode(prompt: str):
-    from open_codex.agent_builder import AgentBuilder
-    print(f"{BLUE}Using model: phi-4-mini-instruct{RESET}")
+def run_one_shot(agent: LLMAgent, user_prompt: str) -> str:   
     try:
-        agent = AgentBuilder.get_agent()
-        response = agent.one_shot_mode(prompt)
-        print_response(response)
+        return agent.one_shot_mode(user_prompt)
+    except ConnectionError:
+        print(f"{RED}Could not connect to Model.{RESET}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"{RED}Error: {e}{RESET}")
+        print(f"{RED}Unexpected error: {e}{RESET}", file=sys.stderr)
+        print(f"{RED}Exiting...{RESET}", file=sys.stderr)
+        sys.exit(1)
 
-def print_help_message():
-    print(f"{BLUE}Usage examples:{RESET}")
-    print(f"{GREEN}open-codex \"list all files in current directory\"")
-    print(f"{GREEN}open-codex \"find all python files modified in the last week\"")
-    print(f"{GREEN}open-codex \"create a tarball of the src directory\"")
-    print()
+def get_help_message():
+    return f"""
+    {BLUE}Usage examples:{RESET}
+    {GREEN}open-codex list all files in current directory
+    {GREEN}open-codex --ollama find all python files modified in the last week
+    {GREEN}open-codex --ollama --model llama3 "create a tarball of the src directory
+    """
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Open Codex is a command line interface for LLMs."
+                                     "It can be used to generate shell commands from natural language prompts.",
+                                     formatter_class=argparse.RawTextHelpFormatter,
+                                     epilog=get_help_message())
+
+    parser.add_argument("prompt", nargs="+", 
+                        help="Natural language prompt")
+    parser.add_argument("--model", type=str, 
+                        help="Model name to use (default: phi4-mini)", default="phi4-mini:latest")
+    parser.add_argument("--ollama", action="store_true", 
+                        help="Use Ollama for LLM inference, use --model to specify the model")
+    parser.add_argument("--ollama-host", type=str, default="http://localhost:11434", 
+                        help="Configure the host for the Ollama API. " \
+                        "If left empty, the default http://localhost:11434 is used.")
+
+    return parser.parse_args()
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("prompt", nargs="*", help="Natural language prompt")
-    args = parser.parse_args()
-    prompt = " ".join(args.prompt).strip()
+    args = parse_args()
+    agent = get_agent(args)
 
-    if not prompt or prompt == "--help":
-        print_help_message()
-        sys.exit(0)
-
-    print(f"{BLUE}Prompt: {prompt}{RESET}", flush=True)
-    one_shot_mode(prompt)
+    # join the prompt arguments into a single string
+    prompt = " ".join(args.prompt).strip() 
+    response = run_one_shot(agent, prompt)
+    print_response(response)
+    action = get_user_action()
+    run_user_action(action, response)
 
 if __name__ == "__main__":
     # We call multiprocessing.freeze_support() because we are using PyInstaller to build a frozen binary.

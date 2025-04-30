@@ -8,39 +8,55 @@
 
 ---
 
-**Open Codex** is a fully open-source command-line AI assistant inspired by OpenAI Codex, supporting local language models like `phi-4-mini`.
+**Open Codex** is a fully open-source command-line AI assistant inspired by OpenAI Codex, supporting local language models like `phi-4-mini` and **full integration with Ollama**.
 
-No API key is required. Everything runs locally.
+🧠 **Runs 100% locally** – no OpenAI API key required. Everything works offline.
 
-Supports:
-- **One-shot mode**: `open-codex "list all folders"` -> returns shell command
-- 🧠 Local-only execution using supported OS models (currently `phi-4-mini`)
+---
+
+## Supports
+
+* **One-shot mode**: `open-codex "list all folders"` -> returns shell command
+* **Ollama integration** for (e.g., LLaMA3, Mistral)
+* Native execution on **macOS, Linux, and Windows**
 
 ---
 ## ✨ Features
 
-- Natural Language to Shell Command (via local models)
-- Works on macOS, Linux, and Windows (Python-based)
-- Confirmation before execution
-- Add to clipboard / abort / execute prompt
-- One-shot interaction mode (interactive and function-calling coming soon)
+- Natural Language → Shell Command (via local or Ollama-hosted LLMs)
+- Local-only execution: no data sent to the cloud
+- Confirmation before running any command
+- Option to copy to clipboard / abort / execute
 - Colored terminal output for better readability
+- Ollama support: use advanced LLMs with `--ollama --model llama3`
+
+### 🔍 Example with Ollama:
+
+```bash
+open-codex --ollama --model llama3 "find all JPEGs larger than 10MB"
+```
+
+Codex will:
+
+1. Send your prompt to the Ollama API (local server, e.g. on `localhost:11434`)
+2. Return a shell command suggestion (e.g., `find . -name "*.jpg" -size +10M`)
+3. Prompt you to execute, copy, or abort
+
+> 🛠️ You must have [Ollama](https://ollama.com) installed and running locally to use this feature.
 
 ---
 
 ## 🧱 Future Plans
 
-- Interactive, context aware mode
+- Interactive, context-aware mode
 - Fancy TUI with `textual` or `rich`
-- Add support for additional OSS Models
 - Full interactive chat mode
 - Function-calling support
-- Voice input via Whisper
-- Command history and undo
+- Whisper-based voice input
+- Command history & undo
 - Plugin system for workflows
 
 ---
-
 
 ## 📦 Installation
 
@@ -53,13 +69,13 @@ brew install open-codex
 ```
 
 
-### 🔹 Option 2: Install via pipx (cross-platform)
+### 🔹 Option 2: Install via pipx (Cross-platform)
 
 ```bash
 pipx install open-codex
 ```
 
-### 🔹 Option 3: Clone & Install locally
+### 🔹 Option 3: Clone & install locally
 
 ```bash
 git clone https://github.com/codingmoh/open-codex.git
@@ -67,28 +83,32 @@ cd open_codex
 pip install .
 ```
 
-
-Once installed, you can use the `open-codex` CLI globally.
+Once installed, use the `open-codex` CLI globally.
 
 ---
 
-## 🚀 Usage
+## 🚀 Usage Examples
 
-### One-shot mode
+### ▶️ One-shot mode
 
 ```bash
 open-codex "untar file abc.tar"
 ```
-
 ✅ Codex suggests a shell command  
 ✅ Asks for confirmation / add to clipboard / abort  
 ✅ Executes if approved
+
+### ▶️ Using Ollama
+
+```bash
+open-codex --ollama --model llama3 "delete all .DS_Store files recursively"
+```
 
 ---
 
 ## 🛡️ Security Notice
 
-All models run locally. Commands are only executed after explicit approval.
+All models run **locally**. Commands are executed **only after your explicit confirmation**.
 
 ---
 
@@ -105,4 +125,3 @@ MIT
 ---
 
 ❤️ Built with love and caffeine by [codingmoh](https://github.com/codingmoh).
-

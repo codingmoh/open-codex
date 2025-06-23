@@ -1,6 +1,7 @@
 import sys
 import argparse
 import subprocess
+import platform
 
 from open_codex.agent_builder import AgentBuilder
 from open_codex.interfaces.llm_agent import LLMAgent
@@ -30,6 +31,20 @@ else:
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return key
+# sys details
+def get_system_info():
+    system = platform.system()
+    release = platform.release()
+    version = platform.version()
+    info = f"OSsystem: {system} {release} {version}"
+    if system == "Linux":
+        try:
+            import distro
+            info += f"\nDistribution: {distro.name(pretty=True)}"
+        except ImportError:
+            pass
+    return info
+
 
 def get_user_action():
     print(f"{BLUE}What do you want to do with this command?{RESET}")
@@ -65,9 +80,10 @@ def get_agent(args: argparse.Namespace) -> LLMAgent:
         print(f"{BLUE}Using model: phi-4-mini-instruct{RESET}")
         return AgentBuilder.get_phi_agent()
 
-def run_one_shot(agent: LLMAgent, user_prompt: str) -> str:   
+def run_one_shot(agent: LLMAgent, user_prompt: str, system_info: str) -> str:
+    full_prompt = f"{user_prompt}\n\nSystem info: {system_info}"
     try:
-        return agent.one_shot_mode(user_prompt)
+        return agent.one_shot_mode(full_prompt)
     except ConnectionError:
         print(f"{RED}Could not connect to Model.{RESET}", file=sys.stderr)
         sys.exit(1)
@@ -105,10 +121,9 @@ def parse_args() -> argparse.Namespace:
 def main():
     args = parse_args()
     agent = get_agent(args)
-
-    # join the prompt arguments into a single string
+    system_info = get_system_info()
     prompt = " ".join(args.prompt).strip() 
-    response = run_one_shot(agent, prompt)
+    response = run_one_shot(agent, prompt, system_info)
     print_response(response)
     action = get_user_action()
     run_user_action(action, response)

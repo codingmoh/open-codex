@@ -79,7 +79,7 @@ pipx install open-codex
 
 ```bash
 git clone https://github.com/codingmoh/open-codex.git
-cd open_codex
+cd open-codex
 pip install .
 ```
 

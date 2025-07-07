@@ -37,4 +37,4 @@ chmod +x "$PKGROOT/usr/bin/$APPNAME"
 
 # Paket bauen
 dpkg-deb --build "$PKGROOT"
-echo "✅ Done: $PKGROOT.deb"
+echo "Done: $PKGROOT.deb"

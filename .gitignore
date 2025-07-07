@@ -237,4 +237,4 @@ pyrightconfig.json
 .vscode/
 brew_formula/
 .pypi_token
-
+debbuild/

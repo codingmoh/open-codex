@@ -1,0 +1,6 @@
+Upstream-Name: open-codex
+Source: https://github.com/codingmoh/open-codex
+
+Files: *
+Copyright: 2025 Mohamed Auf
+License: MIT

@@ -1,0 +1,14 @@
+Source: open-codex
+Section: utils
+Priority: optional
+Maintainer: Mo <coding.moh@gmail.com>
+Build-Depends: debhelper-compat (= 13), python3, pybuild-plugin-pyproject
+Standards-Version: 4.5.0
+Homepage: https://github.com/codingmoh/open-codex
+Rules-Requires-Root: no
+
+Package: open-codex
+Architecture: any
+Depends: ${misc:Depends}, ${python3:Depends}
+Description: Open-Codex is a command-line tool that uses open source large language models (LLMs) to generate shell commands based on natural language input.
+ This package provides the `open-codex` command-line interface.

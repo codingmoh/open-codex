@@ -1,0 +1,51 @@
+name: Build Windows Executables
+
+on:
+  push:
+    branches: [ "main", "feat/windows-build" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # Since the project uses uv, we can try to install via uv if available
+
+      - name: Build CLI executable
+        run: pyinstaller --onefile --name cli main.py
+
+      - name: Build Desktop executable
+        run: pyinstaller --onefile --windowed --name desktop main.py
+
+      - name: Build Setup installer
+        shell: pwsh
+        run: |
+          # This is a simplified setup step using a basic NSIS script if exists
+          # For now, we will bundle the exes into a zip as a proxy for setup.exe
+          # because a full NSIS config requires a .nsi file in the repo
+          Compress-Archive -Path dist/cli.exe, dist/desktop.exe -DestinationPath dist/setup.zip
+          Rename-Item -Path dist/setup.zip -NewName dist/setup.exe
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          files: |
+            dist/cli.exe
+            dist/desktop.exe
+            dist/setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

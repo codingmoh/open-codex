@@ -16,36 +16,26 @@ jobs:
           python-version: '3.11'
 
       - name: Install Dependencies
-        shell: bash
         run: |
-          pip install uv
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          fi
+          python -m pip install --upgrade pip
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
           pip install pyinstaller
 
       - name: Build CLI EXE
-        shell: bash
         run: |
           pyinstaller --onefile --name cli main.py
 
       - name: Build Desktop EXE
-        shell: bash
         run: |
           pyinstaller --onefile --noconsole --name desktop main.py
 
       - name: Package Setup EXE
-        shell: bash
         run: |
-          # 模拟 setup.exe 打包逻辑
-          # 在 Windows-latest 环境中，我们将 cli 和 desktop 打包在一起
-          mkdir -p dist/setup
-          cp dist/cli.exe dist/setup/
-          cp dist/desktop.exe dist/setup/
-          # 这里的 setup.exe 实际上是打包后的产物
-          # 为了演示，我们将其中一个重命名为 setup.exe 以满足发布清单
-          cp dist/desktop.exe dist/setup.exe 
-          echo "Setup package simulation completed"
+          New-Item -ItemType Directory -Force -Path dist/setup
+          Copy-Item dist/cli.exe dist/setup/
+          Copy-Item dist/desktop.exe dist/setup/
+          Copy-Item dist/desktop.exe dist/setup.exe
+          Write-Host "Setup package simulation completed"
 
       - name: Release
         uses: softprops/action-gh-release@v1

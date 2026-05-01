@@ -24,22 +24,15 @@ jobs:
           pip install pyinstaller
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
 
-      - name: Debug Path
-        shell: pwsh
-        run: |
-          Write-Host "Current Working Directory: $(Get-Location)"
-          Write-Host "Listing all files in root:"
-          Get-ChildItem -Recurse -Depth 0
-
       - name: Build CLI
         shell: pwsh
         run: |
-          pyinstaller --onefile main.py -n cli
+          pyinstaller --onefile src/main.py -n cli
 
       - name: Build Desktop
         shell: pwsh
         run: |
-          pyinstaller --onefile main.py -n desktop
+          pyinstaller --onefile src/main.py -n desktop
 
       - name: Prepare artifacts
         shell: pwsh

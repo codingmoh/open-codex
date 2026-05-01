@@ -1,0 +1,48 @@
+name: Build Windows (FIXED-V3)
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
+          pip install pyinstaller
+
+      - name: Build CLI EXE
+        run: |
+          pyinstaller --onefile --name cli main.py
+
+      - name: Build Desktop EXE
+        run: |
+          pyinstaller --onefile --noconsole --name desktop main.py
+
+      - name: Package Setup EXE
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/setup
+          Copy-Item -Path dist/cli.exe -Destination dist/setup/
+          Copy-Item -Path dist/desktop.exe -Destination dist/setup/
+          Copy-Item -Path dist/desktop.exe -Destination dist/setup.exe 
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          files: |
+            dist/cli.exe
+            dist/desktop.exe
+            dist/setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

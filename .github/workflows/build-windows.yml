@@ -1,0 +1,139 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [ "feat/windows-build" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write  # 授予读写权限，用于创建/上传 Release
+    steps:
+      # 1. 拉取仓库代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 配置 Python 3.10 环境
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # 3. 安装依赖：pip升级 + pyinstaller + 项目依赖
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
+
+      # 4. PyInstaller 构建 CLI 单文件程序
+      - name: Build CLI
+        shell: pwsh
+        run: |
+          pyinstaller --onefile src/open_codex/main.py -n cli
+
+      # 5. PyInstaller 构建 桌面GUI 无控制台程序
+      - name: Build Desktop
+        shell: pwsh
+        run: |
+          pyinstaller --onefile --windowed src/open_codex/main.py -n desktop
+
+      # 6. 统一整理产物到 dist_final 目录
+      - name: Prepare artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "dist_final"
+          if (Test-Path "dist/cli.exe") { Copy-Item -Path "dist/cli.exe" -Destination "dist_final/cli.exe" }
+          if (Test-Path "dist/desktop.exe") { Copy-Item -Path "dist/desktop.exe" -Destination "dist_final/desktop.exe" }
+
+      # ========== 新增开始：Inno Setup 生成 install.exe 安装包 ==========
+      # 7. 写入内嵌 Inno Setup 安装脚本，无需仓库额外存文件
+      - name: Generate Inno Setup script
+        shell: pwsh
+        run: |
+          $iss = @'
+[Setup]
+AppName=OpenCodex
+AppVersion=1.0
+DefaultDirName={pf}\OpenCodex
+OutputDir=dist_final
+OutputBaseFilename=install
+Compression=lzma2/fast
+SolidCompression=yes
+PrivilegesRequired=admin
+UninstallDisplayIcon={app}\desktop.exe
+
+[Files]
+Source: "dist_final\desktop.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist_final\cli.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+[Icons]
+Name: "{commondesktop}\OpenCodex 桌面版"; Filename: "{app}\desktop.exe"
+Name: "{commonprograms}\OpenCodex\命令行"; Filename: "{app}\cli.exe"
+
+[UninstallDelete]
+Type: dirifempty; Name: "{app}"
+'@
+          $iss | Out-File -FilePath "install.iss" -Encoding utf8
+
+      # 8. 安装 Inno Setup 并编译生成 install.exe
+      - name: Build install.exe with Inno Setup
+        uses: jonathanpoelen/innosetup-action@v1
+        with:
+          script: ./install.iss
+      # ========== 新增结束 ==========
+
+      # 9. 保留：流水线产物存档（调试用）
+      - name: Upload artifacts (可选，用于调试下载)
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-v3
+          path: dist_final/
+
+      # 10. 创建 Release 载体
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: windows-build-v${{ github.run_number }}
+          release_name: Windows Build V3 - Run #${{ github.run_number }}
+          draft: false
+          prerelease: false
+
+      # 11. 上传 cli.exe 到 Release
+      - name: Upload CLI to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist_final/cli.exe
+          asset_name: cli.exe
+          asset_content_type: application/octet-stream
+
+      # 12. 上传 desktop.exe 到 Release
+      - name: Upload Desktop to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist_final/desktop.exe
+          asset_name: desktop.exe
+          asset_content_type: application/octet-stream
+
+      # 13. 新增：上传自动打包好的 install.exe 安装版到 Release
+      - name: Upload install.exe Installer to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist_final/install.exe
+          asset_name: install.exe
+          asset_content_type: application/octet-stream

@@ -1,48 +1,82 @@
-name: Build Windows (FIXED-V3)
+name: Build Windows V3-FINAL
+
 on:
   push:
-    branches: [ main ]
+    branches: [ "feat/windows-build" ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write  # 给工作流发布 Release 的权限
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
-      - name: Install Dependencies
+      - name: Install dependencies
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          if (Test-Path requirements.txt) { pip install -r requirements.txt }
           pip install pyinstaller
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
 
-      - name: Build CLI EXE
+      - name: Build CLI
+        shell: pwsh
         run: |
-          pyinstaller --onefile --name cli main.py
+          pyinstaller --onefile src/open_codex/main.py -n cli
 
-      - name: Build Desktop EXE
+      - name: Build Desktop
+        shell: pwsh
         run: |
-          pyinstaller --onefile --noconsole --name desktop main.py
+          pyinstaller --onefile --windowed src/open_codex/main.py -n desktop
 
-      - name: Package Setup EXE
+      - name: Prepare artifacts
+        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist/setup
-          Copy-Item -Path dist/cli.exe -Destination dist/setup/
-          Copy-Item -Path dist/desktop.exe -Destination dist/setup/
-          Copy-Item -Path dist/desktop.exe -Destination dist/setup.exe 
+          New-Item -ItemType Directory -Force -Path "dist_final"
+          if (Test-Path "dist/cli.exe") { Copy-Item -Path "dist/cli.exe" -Destination "dist_final/cli.exe" }
+          if (Test-Path "dist/desktop.exe") { Copy-Item -Path "dist/desktop.exe" -Destination "dist_final/desktop.exe" }
 
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      - name: Upload artifacts (可选，用于调试下载)
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: v${{ github.run_number }}
-          files: |
-            dist/cli.exe
-            dist/desktop.exe
-            dist/setup.exe
+          name: windows-build-v3
+          path: dist_final/
+
+      # 新增：发布到 GitHub Release
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: windows-build-v${{ github.run_number }}
+          release_name: Windows Build V3 - Run #${{ github.run_number }}
+          draft: false
+          prerelease: false
+
+      - name: Upload CLI to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist_final/cli.exe
+          asset_name: cli.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload Desktop to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist_final/desktop.exe
+          asset_name: desktop.exe
+          asset_content_type: application/octet-stream

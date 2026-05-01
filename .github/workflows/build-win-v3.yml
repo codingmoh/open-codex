@@ -5,6 +5,9 @@ on:
     branches: [ "feat/windows-build" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -46,3 +49,18 @@ jobs:
         with:
           name: windows-build-v3
           path: dist_final/
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Build-Windows-Auto-v${{ github.run_number }}
+          body: |
+            Automated build from GitHub Actions.
+            Branch: ${{ github.ref_name }}
+            Run Number: ${{ github.run_number }}
+          files: |
+            dist_final/cli.exe
+            dist_final/desktop.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
